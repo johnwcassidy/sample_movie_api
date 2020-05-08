@@ -1,0 +1,126 @@
+openapi: 3.0.0
+info:
+  version: '1.0.0'
+  title: Sample Movie API
+  description: Sample API to fetch movies and assets by category
+servers:
+  - url: 'https://sample-movie-api.web.app'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Movie:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+        video:
+          type: string
+    Category:
+      type: object
+      properties:
+        title:
+          type: string
+        filter:
+          type: string
+  parameters:
+    Category:
+      name: category
+      in: query
+      description: Category that maps to the search query
+      schema:
+        type: string
+  responses:
+    400Error:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+paths:
+  /categories:
+    get:
+      description: Returns a list of Categories
+      responses:
+        '200':
+          description: Successfully returned a list of Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
+        '400':
+          $ref: '#/components/responses/400Error'
+  /movies:
+    get:
+      description: Returns a list of Movies
+      parameters:
+        - $ref: '#/components/parameters/Category'
+      responses:
+        '200':
+          description: Successfully returned a list of Movies by optional Category
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movie'
+        '400':
+          $ref: '#/components/responses/400Error'
+  /login:
+    post:
+      description: Authenticate user
+      requestBody:
+        description: Username and Password for authentication
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Successfully returned a list of Movies by optional Category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email:
+                    type: string
+                  token:
+                    type: string
+        '400':
+          $ref: '#/components/responses/400Error'
+  /watchlist:
+    get:
+      description: Retrieve watchlist specific to logged in user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully returned a list of Watchlist Movies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movie'
+        '400':
+          $ref: '#/components/responses/400Error'
