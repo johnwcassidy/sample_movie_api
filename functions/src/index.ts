@@ -11,6 +11,7 @@ admin.initializeApp();
 firebase.initializeApp(functions.config().fconfig.key);
 
 interface Movie {
+  id: string;
   title: string;
   description: string;
   image: string;
@@ -25,6 +26,22 @@ interface Category {
 interface UserDetails {
   email: string;
   token: string;
+}
+
+interface WatchlistItems {
+  [key: string]: WatchlistItem
+}
+
+interface WatchlistEntry {
+  id?: string;
+  bookmark: number;
+  movie_id: string;
+}
+
+interface WatchlistItem {
+  id?: string;
+  bookmark?: number;
+  movie?: Movie;
 }
 
 const fetchUser = (request: express.Request, response: express.Response) => {
@@ -84,6 +101,7 @@ const fetchMoviesByCategory = (request: express.Request, response: express.Respo
       snapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
         const movie: any = doc.data();
         ret.push({
+          id: doc.id,
           title: movie.title,
           description: movie.description,
           image: movie.image,
@@ -102,11 +120,23 @@ const fetchWatchlist = async (request: express.Request, response: express.Respon
   // fetch the watchlist according to the logged in user (don't use this as model of security, we're using the admin api here)
   const watchlist = admin.firestore().collection('userdata').doc(request.userData.uid).collection('watchlist');
 
+  // data store for watchlist items to be resolved later on
+  let watchListRet: WatchlistItems = {};
+
   const movieIds: string[] = [];
   const snapshot: admin.firestore.QuerySnapshot = await watchlist.get();
   snapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
     const watchlistItem: any = doc.data();
-    movieIds.push(watchlistItem.movie_id.trim());
+    
+    const watchlistId: string = doc.id;
+    const movieId: string = watchlistItem.movie_id.trim();
+    
+    watchListRet[movieId] = {
+      id: watchlistId,
+      bookmark: watchlistItem.bookmark
+    };
+
+    movieIds.push(movieId);
   });
 
   // handle empty data set
@@ -118,18 +148,77 @@ const fetchWatchlist = async (request: express.Request, response: express.Respon
   const movies = admin.firestore().collection('movies').where(admin.firestore.FieldPath.documentId(), 'in', movieIds);
   const moviesSnapshot: admin.firestore.QuerySnapshot = await movies.get();
 
-  const ret: Movie[] = [];
+  const ret: WatchlistItem[] = [];
   moviesSnapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
     const movie: any = doc.data();
-    ret.push({
+    const movieId: string = doc.id;
+
+    // resolve watchlist items to movie
+    watchListRet[movieId].movie = {
+      id: movieId,
       title: movie.title,
       description: movie.description,
       image: movie.image,
       video: movie.video
-    });
+    };
+
+    ret.push(watchListRet[movieId]);
   });
 
   return response.status(200).json({ data: ret });
+}
+
+const addWatchlistItem = async (request: express.Request, response: express.Response) => {
+
+  // validate parameters
+  if (!request.body.bookmark) {
+    return response.status(400).json({ message: 'Bookmark required' });
+  }
+
+  if (!request.body.movie_id || request.body.movie_id.trim().length === 0) {
+    return response.status(400).json({ message: 'movie_id required' });
+  }
+
+  const watchlist: WatchlistEntry = {
+    bookmark: request.body.bookmark,
+    movie_id: request.body.movie_id
+  };
+
+  const watchlistCol = admin.firestore().collection('userdata').doc(request.userData.uid).collection('watchlist');
+  await watchlistCol.add(watchlist);
+
+  return response.status(200).json({ message: "Watchlist item added" });
+}
+
+const deleteWatchlistItem = async (request: express.Request, response: express.Response) => {
+  
+  if (!request.params.id || request.params.id.trim().length === 0) {
+    return response.status(400).json({ message: 'movie_id required' });
+  }
+
+  const watchlistDoc = admin.firestore().collection('userdata').doc(request.userData.uid).collection('watchlist').doc(request.params.id);
+  await watchlistDoc.delete();
+
+  return response.status(200).json({ message: "Watchlist item deleted" });
+}
+
+const updateWatchistItem = async (request: express.Request, response: express.Response) => {
+  
+  // validate parameters
+  if (!request.body.bookmark) {
+    return response.status(400).json({ message: 'Bookmark required' });
+  }
+
+  if (!request.body.movie_id || request.body.movie_id.trim().length === 0) {
+    return response.status(400).json({ message: 'movie_id required' });
+  }
+
+  const watchlistDoc = admin.firestore().collection('userdata').doc(request.userData.uid).collection('watchlist').doc(request.body.movie_id);
+  await watchlistDoc.update({
+    bookmark: request.body.bookmark
+  });
+
+  return response.status(200).json({ message: "Watchlist item updated" });
 }
 
 const main = express();
@@ -144,5 +233,8 @@ main.post('/login', fetchUser);
 
 // endpoints requiring auth validation
 main.get('/watchlist', validateFirebaseIdToken, fetchWatchlist);
+main.post('/watchlist', validateFirebaseIdToken, addWatchlistItem);
+main.patch('/watchlist', validateFirebaseIdToken, updateWatchistItem);
+main.delete('/watchlist/:id', validateFirebaseIdToken, deleteWatchlistItem);
 
 exports.main = functions.https.onRequest(main);
