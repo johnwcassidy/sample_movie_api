@@ -12,6 +12,9 @@ firebase.initializeApp(functions.config().fconfig.key);
 
 interface Movie {
   title: string;
+  description: string;
+  image: string;
+  video: string;
 }
 
 interface Category {
@@ -82,6 +85,9 @@ const fetchMoviesByCategory = (request: express.Request, response: express.Respo
         const movie: any = doc.data();
         ret.push({
           title: movie.title,
+          description: movie.description,
+          image: movie.image,
+          video: movie.video
         });
       });
       return response.status(200).json({ data: ret });
@@ -117,6 +123,9 @@ const fetchWatchlist = async (request: express.Request, response: express.Respon
     const movie: any = doc.data();
     ret.push({
       title: movie.title,
+      description: movie.description,
+      image: movie.image,
+      video: movie.video
     });
   });
 
