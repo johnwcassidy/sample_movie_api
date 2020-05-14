@@ -91,22 +91,36 @@ const fetchMoviesByCategory = (request: express.Request, response: express.Respo
     });
 };
 
-const fetchWatchlist = (request: express.Request, response: express.Response) => {
-  // fetch the watchlist according to the logged in user (don't use this as model of security, we're using the admin api here)
-  const db = admin.firestore();
-  db.collection('userdata').doc(request.userData.uid).collection('watchlist').get().then( (snapshot: admin.firestore.QuerySnapshot) => {
-    const ret: Movie[] = [];
-      snapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
-        const movie: any = doc.data();
-        ret.push({
-          title: movie.title,
-        });
-      });
-      return response.status(200).json({ data: ret });
-  }).catch( () => {
-    return response.status(200).json({ data: [] });
-  })
+const fetchWatchlist = async (request: express.Request, response: express.Response) => {
 
+  // fetch the watchlist according to the logged in user (don't use this as model of security, we're using the admin api here)
+  const watchlist = admin.firestore().collection('userdata').doc(request.userData.uid).collection('watchlist');
+
+  const movieIds: string[] = [];
+  const snapshot: admin.firestore.QuerySnapshot = await watchlist.get();
+  snapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
+    const watchlistItem: any = doc.data();
+    movieIds.push(watchlistItem.movie_id.trim());
+  });
+
+  // handle empty data set
+  if (movieIds.length === 0) {
+    return response.status(200).json({ data: [] });
+  }
+
+  // fetch movies matching watchlist
+  const movies = admin.firestore().collection('movies').where(admin.firestore.FieldPath.documentId(), 'in', movieIds);
+  const moviesSnapshot: admin.firestore.QuerySnapshot = await movies.get();
+
+  const ret: Movie[] = [];
+  moviesSnapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
+    const movie: any = doc.data();
+    ret.push({
+      title: movie.title,
+    });
+  });
+
+  return response.status(200).json({ data: ret });
 }
 
 const main = express();

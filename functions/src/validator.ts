@@ -34,7 +34,6 @@ export default async (req: express.Request, res: express.Response, next: express
   try {
     // retrieve decoded ID token as user info
     const decodedToken = await validateToken(idToken);
-    console.log(decodedToken);
     req.userData = decodedToken;
     next();
     return;
