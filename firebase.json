@@ -14,7 +14,7 @@
     "redirects": [
       {
         "source": "/",
-        "destination": "https://hub.apitree.com/johnwcassidy/sample-movie-api/",
+        "destination": "https://app.swaggerhub.com/apis-docs/johnwcassidy/sample-movie-api/1.0.0#/",
         "type": 301
       }
     ]
