@@ -4,6 +4,7 @@ import * as firebase from 'firebase';
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import validateFirebaseIdToken from './validator';
+import { UserRecord } from 'firebase-functions/lib/providers/auth';
 
 admin.initializeApp();
 
@@ -125,7 +126,7 @@ const fetchWatchlist = async (request: express.Request, response: express.Respon
   const watchlist = admin.firestore().collection('userdata').doc(request.userData.uid).collection('watchlist');
 
   // data store for watchlist items to be resolved later on
-  let watchListRet: WatchlistItems = {};
+  const watchListRet: WatchlistItems = {};
 
   const movieIds: string[] = [];
   const snapshot: admin.firestore.QuerySnapshot = await watchlist.get();
@@ -249,3 +250,45 @@ main.patch('/watchlist', validateFirebaseIdToken, updateWatchistItem);
 main.delete('/watchlist/:id', validateFirebaseIdToken, deleteWatchlistItem);
 
 exports.main = functions.https.onRequest(main);
+
+// Cloud function to detect new users and add some sample watchlist data
+exports.addMockWatchlistData = functions.auth.user().onCreate(async (user: UserRecord) => {
+  try {
+    const movieSnapshot: admin.firestore.QuerySnapshot = await admin.firestore().collection('movies').limit(2).get();
+    let movieIds: string[] = [];
+    movieSnapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
+      movieIds.push(doc.id);
+    });
+
+    const watchlistRef = admin.firestore().collection('userdata').doc(user.uid).collection('watchlist');
+    let batch = admin.firestore().batch();
+    movieIds.forEach((movieId: string) => {
+      batch.set(watchlistRef.doc(), {
+        bookmark: 1500,
+        movie_id: movieId,
+      });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.log('Error adding mock data');
+  }
+});
+
+exports.deleteUserData = functions.auth.user().onDelete(async (user: UserRecord) => {
+  try {
+    const userDataRef = admin.firestore().collection('userdata').doc(user.uid);
+    const userWatchlistCol = userDataRef.collection('watchlist');
+
+    // retrieve all documents of the watchlist collection to delete
+    let batch = admin.firestore().batch();
+    const watchlistSnapshot: admin.firestore.QuerySnapshot = await userWatchlistCol.get();
+    watchlistSnapshot.forEach((doc: admin.firestore.DocumentSnapshot) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    await userDataRef.delete();
+  } catch (error) {
+    console.log('Error deleting mock data');
+  }
+});

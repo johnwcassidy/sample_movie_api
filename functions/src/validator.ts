@@ -16,7 +16,7 @@ export default async (req: express.Request, res: express.Response, next: express
       'Authorization: Bearer <Firebase ID Token>',
       'or by passing a "__session" cookie.'
     );
-    return res.status(401).send({ message: 'Unauthorized'});
+    return res.status(401).send({ message: 'Unauthorized' });
   }
 
   let idToken;
@@ -28,7 +28,7 @@ export default async (req: express.Request, res: express.Response, next: express
     idToken = req.cookies.__session;
   } else {
     // No cookie
-    return res.status(401).send({ message: 'Unauthorized'});
+    return res.status(401).send({ message: 'Unauthorized' });
   }
 
   try {
@@ -38,7 +38,7 @@ export default async (req: express.Request, res: express.Response, next: express
     next();
     return;
   } catch (error) {
-    return res.status(401).send({ message: 'Unauthorized'});
+    return res.status(401).send({ message: 'Unauthorized' });
   }
 };
 
@@ -49,6 +49,7 @@ const validateToken = (tokenId: string) => {
       .verifyIdToken(tokenId)
       .then((decodedToken) => resolve(decodedToken))
       .catch((error) => {
+        // if token has expired, let's go ahead and try to get a new one
         reject(new Error('401'));
       });
   });
